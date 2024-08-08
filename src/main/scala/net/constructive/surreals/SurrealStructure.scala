@@ -3,6 +3,7 @@ package net.constructive.surreals
 import cats.{Functor, PartialOrder}
 import higherkindness.droste.*
 import higherkindness.droste.data.Fix
+import com.github.blemale.scaffeine.{ Cache, Scaffeine }
 
 trait SurrealStructure[+S]
 
@@ -74,9 +75,7 @@ object SurrealStructure:
 
     override def lteqv(x: Structure, y: Structure): Boolean = (x, y) match
       case (x, y) if (x == y) => true
-      case (EmptySet, _) => true
-      case (_, EmptySet) => false
-      case (ZeroS, s) => lteqZero(s)
+      case (EmptySet, _) | (_, EmptySet) => true
       case (EpsilonS, s) =>  lteqEpsilon(s)
       case (OmegaS, s) =>  lteqOmega(s)
       case (TauS, s) =>  lteqTau(s)
@@ -84,16 +83,7 @@ object SurrealStructure:
             SurrealStructure(_, yr:Structure)) =>
         gt(y, xl) && gt(yr, x)
 
-    def lteqZero(s: Structure): Boolean = s match {
-      case EmptySet => true
-      case ZeroS => true
-      case EpsilonS => false
-      case OmegaS => false
-      case TauS => false
-      case SurrealStructure(_, r: Structure) => gt(r, Fix(ZeroS))
-    }
-
-    def lteqEpsilon(s: Structure): Boolean = s match {
+    inline def lteqEpsilon(s: Structure): Boolean = s match {
       case EmptySet => true
       case ZeroS => true
       case EpsilonS => true
@@ -102,7 +92,7 @@ object SurrealStructure:
       case SurrealStructure(_, r: Structure) => gt(r, Fix(EpsilonS))
     }
 
-    def lteqOmega(s: Structure): Boolean = s match {
+    inline def lteqOmega(s: Structure): Boolean = s match {
       case EmptySet => true
       case ZeroS => true
       case EpsilonS => true
@@ -111,7 +101,7 @@ object SurrealStructure:
       case SurrealStructure(_, r: Structure) => gt(r, Fix(OmegaS))
     }
 
-    def lteqTau(s: Structure): Boolean = s match {
+    inline def lteqTau(s: Structure): Boolean = s match {
       case EmptySet => true
       case ZeroS => true
       case OmegaS => true
@@ -120,7 +110,19 @@ object SurrealStructure:
       case SurrealStructure(_, r: Structure) => gt(r, Fix(TauS))
     }
 
+    val gtCache: Cache[(Structure, Structure), Boolean] =
+      Scaffeine().recordStats().maximumSize(100000).build()
+
     override def gt(x: Structure, y: Structure): Boolean =
+      gtCache.getIfPresent(x -> y).getOrElse(setGT(x, y))
+
+    def setGT(x: Structure, y: Structure): Boolean = {
+      val gt = calcGT(x, y)
+      gtCache.put(x -> y, gt)
+      gt
+    }
+
+    def calcGT(x: Structure, y: Structure): Boolean =
       if (x == EmptySet || y == EmptySet) true
       else !(lteqv(x, y))
 
@@ -136,7 +138,19 @@ object SurrealStructure:
     case GeneralS(l,  r) => DyadicNumber(l, r)
   }
 
+  val plusCache: Cache[(Structure, Structure), Structure] =
+    Scaffeine().recordStats().maximumSize(100000).build()
+
   def plus(x: Structure, y: Structure): Structure =
+    plusCache.getIfPresent(x -> y).getOrElse(setPlus(x, y))
+
+  def setPlus(x: Structure, y: Structure): Structure = {
+    val plus = calcPlus(x, y)
+    plusCache.put(x -> y, plus)
+    plus
+  }
+
+  def calcPlus(x: Structure, y: Structure): Structure =
     (x, y) match
       case (EmptySet, _) => Fix(EmptySet)
       case (_, EmptySet) => Fix(EmptySet)

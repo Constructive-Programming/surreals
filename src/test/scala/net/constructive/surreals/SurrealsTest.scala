@@ -3,26 +3,26 @@ package net.constructive.surreals
 //import algebra.laws.RingLaws
 import munit.DisciplineSuite
 import cats.PartialOrder
+import higherkindness.droste.data.Fix
 import org.scalacheck.*
 import org.scalacheck.Prop.*
 
 class SurrealsTest extends DisciplineSuite:
-  def surrealGen: Gen[Surreal] =
-    Gen.oneOf(Zero, Omega, Epsilon)
-
-  given surrealArb[S]: Arbitrary[Surreal] = Arbitrary(surrealGen)
 
   val field = SurrealField()
 
   //checkAll("Surreals", RingLaws[Surreal].field(field))
 
-  test("simple string representation") {
+  test("simple string representations") {
     import field.*
     assertEquals(Surreal.stringRep(Zero), Strings.Zero)
     assertEquals(Surreal.stringRep(Omega), Strings.Omega)
     assertEquals(Surreal.stringRep(Epsilon), Strings.Epsilon)
     assertEquals(Surreal.stringRep(One), s"{ ${Strings.Zero} | }")
     assertEquals(Surreal.stringRep(inc(One)), s"{ { ${Strings.Zero} | } | }")
+    assertEquals(Surreal.stringRep(inc(dec(Epsilon))), Strings.Epsilon)
+    assertEquals(Surreal.stringRep(inc(inc(Omega))), s"{ { ${Strings.Omega} | } | }")
+    assertEquals(Surreal.stringRep(dec(dec(Tau))), s"{ | { | ${Strings.Tau} } }")
   }
 
   property("int representation") {
@@ -37,11 +37,13 @@ class SurrealsTest extends DisciplineSuite:
   }
 
 
-  val smallInts = Gen.choose(-10, 10)
-  val pairOfSmallInts = smallInts.flatMap(i => smallInts.map(_ -> i))
+  val tinyInts = Gen.choose(-3, 3)
+  val smallInts = Gen.choose(-100, 100)
 
-  property("intComparisons") {
-    forAll(pairOfSmallInts) { (i, j) =>
+  val specialSurreals = Gen.oneOf(OmegaS, EpsilonS, TauS)
+
+  property("int comparisons") {
+    forAll(smallInts, smallInts) { (i, j) =>
       import SurrealStructure.*
       val si = intStructure(i)
       val sj = intStructure(j)
@@ -53,7 +55,7 @@ class SurrealsTest extends DisciplineSuite:
   }
 
   property("int addition") {
-    forAll(pairOfSmallInts) { (i, j) =>
+    forAll(smallInts, smallInts) { (i, j) =>
       import SurrealStructure.*
       val si = intStructure(i)
       val sj = intStructure(j)
@@ -63,3 +65,28 @@ class SurrealsTest extends DisciplineSuite:
       )
     }
   }
+
+  test("special addition with int") {
+      import SurrealStructure.partialOrder
+      val si = Fix(OmegaS)
+      assert(partialOrder.gt(Fix(LeftS(si)), si))
+      assert(partialOrder.gt(Fix(LeftS(Fix(LeftS(si)))), si))
+      assert(partialOrder.gt(Fix(LeftS(Fix(LeftS(Fix(LeftS(si)))))), si))
+      assert(partialOrder.gt(si, Fix(RightS(si))))
+      assert(partialOrder.gt(si, Fix(RightS(Fix(RightS(Fix(RightS(si))))))))
+      assert(partialOrder.gt(si, Fix(RightS(Fix(RightS(Fix(RightS(Fix(RightS(si))))))))))
+      assert(partialOrder.gt(si, Fix(RightS(Fix(RightS(si))))))
+  }
+
+  // property("special addition with int") {
+  //   forAll(specialSurreals, tinyInts) { (i, j) =>
+  //     import SurrealStructure.*
+  //     val si = Fix(i)
+  //     val sj = intStructure(j)
+  //     val sjInv = intStructure(-j)
+  //     assertEquals(
+  //       SurrealStructure.partialOrder.partialCompare(plus(plus(si, sj), sjInv), si),
+  //       0.0
+  //     )
+  //   }
+  // }

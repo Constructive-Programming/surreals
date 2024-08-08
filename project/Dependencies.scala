@@ -7,6 +7,8 @@ object Dependencies {
     // cats
     val Cats       = "2.9.0"
 
+    val SCaffeine = "5.3.0"
+
     // droste (recursion schemes)
     val Droste = "0.9.0"
 
@@ -28,6 +30,8 @@ object Dependencies {
 
     val Droste = droste("droste-core")
     val DrosteMacros = droste("droste-macros")
+
+    val SCaffeine = "com.github.blemale" %% "scaffeine" % Versions.SCaffeine
 
     val DisciplineMUnit = "org.typelevel" %% "discipline-munit" % Versions.DisciplineMUnit
     val ScalacheckCats = "io.chrisdavenport" %% "cats-scalacheck" % Versions.ScalacheckCats

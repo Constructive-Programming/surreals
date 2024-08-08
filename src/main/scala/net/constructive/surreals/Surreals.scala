@@ -37,8 +37,12 @@ case class SurrealField() extends Field[Surreal]:
   def one = One
 
   def inc: Surreal => Surreal =
-    case n@(Zero | Omega | Epsilon | LeftNumber(_)) => LeftNumber(n)
+    case n@(Zero | Omega | Epsilon | Tau | LeftNumber(_)) => LeftNumber(n)
     case RightNumber(s) => s
+
+  def dec: Surreal => Surreal =
+    case n@(Zero | Omega | Epsilon | Tau | RightNumber(_)) => RightNumber(n)
+    case LeftNumber(s) => s
 
   def negate(n: Surreal) = n match
     case Zero => Zero
