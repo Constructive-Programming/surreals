@@ -131,6 +131,17 @@ object SurrealStructure:
       case (SurrealStructure(xl:Structure, _), EmptySet) => lteqv(y, xl)
       case _ => !lteqv(x, y)
 
+    def pickMax(x: Structure, y: Structure): Structure = (x, y) match
+      case (EmptySet, p) => p
+      case (p, EmptySet) => p
+      case _ if lteqv(x, y) => y
+      case _ => x
+
+    def pickMin(x: Structure, y: Structure): Structure = (x, y) match
+      case (EmptySet, p) => p
+      case (p, EmptySet) => p
+      case _ if lteqv(x, y) => x
+      case _ => y
   }
 
   val toSurreal: Algebra[SurrealStructure, Surreal] = Algebra {
@@ -142,6 +153,25 @@ object SurrealStructure:
     case RightS(r) => RightNumber(r)
     case GeneralS(l,  r) => DyadicNumber(l, r)
   }
+
+  val negateCache: Cache[Structure, Structure] =
+    Scaffeine().recordStats().maximumSize(100000).build()
+
+  def negate(x: Structure): Structure =
+    negateCache.getIfPresent(x).getOrElse(setNegate(x))
+
+  def setNegate(x: Structure): Structure = {
+    val neg = calcNegate(x)
+    negateCache.put(x, neg)
+    neg
+  }
+
+  def calcNegate(x: Structure): Structure =
+    x match
+      case EmptySet => Fix(EmptySet)
+      case ZeroS => Fix(ZeroS)
+      case SurrealStructure(xl, xr) =>
+        SurrealStructure(negate(xr), negate(xl))
 
   val plusCache: Cache[(Structure, Structure), Structure] =
     Scaffeine().recordStats().maximumSize(100000).build()
@@ -162,10 +192,59 @@ object SurrealStructure:
       case (x, ZeroS) => x
       case (ZeroS, y) => y
       case (SurrealStructure(xl, xr), SurrealStructure(yl, yr)) =>
-        SurrealStructure(
-          partialOrder.pmax(plus(xl, y), plus(x, yl)).getOrElse(Fix(EmptySet)),
-          partialOrder.pmin(plus(xr, y), plus(x, yr)).getOrElse(Fix(EmptySet))
-        )
+        val xl_y = plus(xl, y)
+        val x_yl = plus(x, yl)
+        val xr_y = plus(xr, y)
+        val x_yr = plus(x, yr)
+
+        val rl = partialOrder.pmax(xl_y, x_yl)
+        val rr = partialOrder.pmin(xr_y, x_yr)
+
+        SurrealStructure(rl.getOrElse(Fix(EmptySet)), rr.getOrElse(Fix(EmptySet)))
+
+  val timesCache: Cache[(Structure, Structure), Structure] =
+    Scaffeine().recordStats().maximumSize(100000).build()
+
+  def times(x: Structure, y: Structure): Structure =
+    timesCache.getIfPresent(x -> y).getOrElse(setTimes(x, y))
+
+  def setTimes(x: Structure, y: Structure): Structure = {
+    val times = calcTimes(x, y)
+    timesCache.put(x -> y, times)
+    times
+  }
+
+  def calcTimes(x: Structure, y: Structure): Structure =
+    (x, y) match
+      case (EmptySet, _) => Fix(EmptySet)
+      case (_, EmptySet) => Fix(EmptySet)
+      case (x, ZeroS) => Fix(ZeroS)
+      case (ZeroS, y) => Fix(ZeroS)
+      case (x, LeftS(ZeroS)) => x
+      case (LeftS(ZeroS), y) => y
+      case (x, RightS(ZeroS)) => negate(x)
+      case (RightS(ZeroS), y) => negate(y)
+      case (SurrealStructure(xl, xr), SurrealStructure(yl, yr)) =>
+        val xl_y = times(xl, y)
+        val x_yl = times(x, yl)
+        val xl_yl = times(xl, yl)
+
+        val xr_y = times(xr, y)
+        val x_yr = times(x, yr)
+        val xr_yr = times(xr, yr)
+
+        val xl_yr = times(xl, yr)
+        val xr_yl = times(xr, yl)
+
+        val rla = plus(plus(xl_y, x_yl), negate(xl_yl))
+        val rlb = plus(plus(xr_y, x_yr), negate(xr_yr))
+        val rl = partialOrder.pickMax(rla, rlb)
+
+        val rra = plus(plus(xl_y, x_yr), negate(xl_yr))
+        val rrb = plus(plus(xr_y, x_yl), negate(xr_yl))
+        val rr = partialOrder.pickMin(rra, rrb)
+
+        SurrealStructure(rl, rr)
 
   def fromSurreal[S](trans: Surreal => S): GCoalgebra[SurrealStructure, Surreal, S] = GCoalgebra {
     case Zero => ZeroS

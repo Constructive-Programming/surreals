@@ -66,6 +66,18 @@ class SurrealsTest extends DisciplineSuite:
     }
   }
 
+  property("int mult") {
+    forAll(tinyInts, tinyInts) { (i, j) =>
+      import SurrealStructure.*
+      val si = intStructure(i)
+      val sj = intStructure(j)
+      assertEquals(
+        SurrealStructure.partialOrder.partialCompare(times(si, sj), intStructure(i * j)),
+        0.0
+      )
+    }
+  }
+
   test("special addition with int") {
       import SurrealStructure.partialOrder
       val si = Fix(OmegaS)
