@@ -75,6 +75,10 @@ object SurrealStructure:
 
     override def lteqv(x: Structure, y: Structure): Boolean = (x, y) match
       case (x, y) if (x == y) => true
+      case (LeftS(xl), _) if xl == y => false
+      case (_, LeftS(yl)) if x == yl => true
+      case (RightS(xr), _) if xr == y => true
+      case (_, RightS(yr)) if x == yr => false
       case (EmptySet, _) | (_, EmptySet) => true
       case (EpsilonS, s) =>  lteqEpsilon(s)
       case (OmegaS, s) =>  lteqOmega(s)
@@ -122,9 +126,10 @@ object SurrealStructure:
       gt
     }
 
-    def calcGT(x: Structure, y: Structure): Boolean =
-      if (x == EmptySet || y == EmptySet) true
-      else !(lteqv(x, y))
+    def calcGT(x: Structure, y: Structure): Boolean = (x, y) match
+      case (EmptySet, SurrealStructure(_, yr:Structure)) => lteqv(yr, x)
+      case (SurrealStructure(xl:Structure, _), EmptySet) => lteqv(y, xl)
+      case _ => !lteqv(x, y)
 
   }
 
